@@ -3,6 +3,8 @@ package com.surendramaran.yolov8tflite
 import android.content.Context
 import android.graphics.Bitmap
 import android.os.SystemClock
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import com.surendramaran.yolov8tflite.MetaData.extractNamesFromLabelFile
 import com.surendramaran.yolov8tflite.MetaData.extractNamesFromMetadata
 import org.tensorflow.lite.DataType
@@ -31,6 +33,9 @@ class Detector(
     private var tensorHeight = 0
     private var numChannel = 0
     private var numElements = 0
+    // Модель из ultralytics (LiteRT) принимает вход [1,3,H,W] (каналы первыми), а не [1,H,W,3]
+    private var inputNchw = false
+    private var nchwBuffer: ByteBuffer? = null
 
     private val imageProcessor = ImageProcessor.Builder()
         .add(NormalizeOp(INPUT_MEAN, INPUT_STANDARD_DEVIATION))
@@ -41,7 +46,7 @@ class Detector(
         val compatList = CompatibilityList()
 
         val options = Interpreter.Options().apply{
-            if(compatList.isDelegateSupportedOnThisDevice){
+            if (USE_GPU && compatList.isDelegateSupportedOnThisDevice) {
                 val delegateOptions = compatList.bestOptionsForThisDevice
                 this.addDelegate(GpuDelegate(delegateOptions))
             } else {
@@ -73,6 +78,7 @@ class Detector(
             if (inputShape[1] == 3) {
                 tensorWidth = inputShape[2]
                 tensorHeight = inputShape[3]
+                inputNchw = true
             }
         }
 
@@ -106,32 +112,39 @@ class Detector(
             return
         }
 
-        var inferenceTime = SystemClock.uptimeMillis()
-
-
-
         val resizedBitmap = Bitmap.createScaledBitmap(frame, tensorWidth, tensorHeight, false)
 
         val tensorImage = TensorImage(INPUT_IMAGE_TYPE)
         tensorImage.load(resizedBitmap)
         val processedImage = imageProcessor.process(tensorImage)
-        val imageBuffer = processedImage.buffer
-
-        println("numChannel: $numChannel")
-        println("numElements: $numElements")
+        val imageBuffer = if (inputNchw) toNchw(processedImage.tensorBuffer.floatArray) else processedImage.buffer
 
         val output = TensorBuffer.createFixedSize(intArrayOf(1, numChannel, numElements), OUTPUT_IMAGE_TYPE)
+        // Профилирование: измеряется только вызов модели (без подготовки картинки и постобработки)
+        val modelStart = SystemClock.elapsedRealtimeNanos()
         interpreter.run(imageBuffer, output.buffer)
+        val modelTimeMs = (SystemClock.elapsedRealtimeNanos() - modelStart) / 1_000_000
 
         val bestBoxes = bestBox(output.floatArray)
-        inferenceTime = SystemClock.uptimeMillis() - inferenceTime
 
         if (bestBoxes == null) {
             detectorListener.onEmptyDetect()
             return
         }
 
-        detectorListener.onDetect(bestBoxes, inferenceTime)
+        detectorListener.onDetect(bestBoxes, modelTimeMs)
+    }
+
+    // HWC (пиксели подряд) -> CHW (сначала весь R, потом G, потом B)
+    private fun toNchw(hwc: FloatArray): ByteBuffer {
+        val plane = tensorWidth * tensorHeight
+        val buf = nchwBuffer ?: ByteBuffer.allocateDirect(plane * 3 * 4)
+            .order(ByteOrder.nativeOrder()).also { nchwBuffer = it }
+        buf.rewind()
+        val fb = buf.asFloatBuffer()
+        for (ch in 0 until 3) for (i in 0 until plane) fb.put(hwc[i * 3 + ch])
+        buf.rewind()
+        return buf
     }
 
     private fun bestBox(array: FloatArray) : List<BoundingBox>? {
@@ -153,7 +166,7 @@ class Detector(
             }
 
             if (maxConf > CONFIDENCE_THRESHOLD) {
-                val clsName = labels[maxIdx]
+                val clsName = labels.getOrElse(maxIdx) { "class$maxIdx" }
                 val cx = array[c] // 0
                 val cy = array[c + numElements] // 1
                 val w = array[c + numElements * 2]
@@ -225,6 +238,7 @@ class Detector(
         private const val INPUT_STANDARD_DEVIATION = 255f
         private val INPUT_IMAGE_TYPE = DataType.FLOAT32
         private val OUTPUT_IMAGE_TYPE = DataType.FLOAT32
+        private const val USE_GPU = false  // GPU-делегат может падать на новых моделях; включать после проверки на CPU
         private const val CONFIDENCE_THRESHOLD = 0.3F
         private const val IOU_THRESHOLD = 0.5F
     }
