@@ -1,0 +1,11 @@
+.git
+**/__pycache__
+dataset
+results
+runs
+.venv
+*.zip
+YOLOv8-Object-Detector-Android-Tflite
+notebooks
+docs
+.idea
