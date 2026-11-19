@@ -158,7 +158,7 @@ YOLO("results/v2_4cls/weights/best.pt").export(format="litert", imgsz=640)
 | Среднее время `interpreter.run`, мс | 153.6 (медиана 149) |
 | Минимум / максимум, мс | 145 / 202 |
 
-Скриншоты: `docs/profiling/`.
+Скриншоты: [docs/profiling/PROFILING.md](docs/profiling/PROFILING.md)
 
 ## Лицензии и источники
 
