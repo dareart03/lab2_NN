@@ -13,7 +13,7 @@
 
 ## Ссылки
 
-- Размеченный набор данных: [Ссылка на архив `prepared_4cls.zip` (GitHub Release)](https://github.com/dareart03/lab2_NN/releases/tag/dataset-v2)
+- Размеченный набор данных: [prepared_4cls.zip (GitHub Release)](https://github.com/dareart03/lab2_NN/releases/tag/dataset-v2)
 - Ноутбук с обучением: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/dareart03/lab2_NN/blob/main/notebooks/Lab2_YOLO26_variant1.ipynb)
 - Источники кода и данных, лицензии: [docs/ATTRIBUTION.md](docs/ATTRIBUTION.md)
 
@@ -87,9 +87,9 @@ docker run --rm -v <путь_к_датасету>:/data -v <путь_к_резу
 
 Параметры `train.py`: `--data-dir` (по умолчанию `/data`), `--results-dir` (по умолчанию `/results`), `--epochs`, `--imgsz`, `--batch`, `--device`, `--name`, `--export litert`. В результатах появляются `weights/best.pt`, `metrics.json` (метрики на val по классам), графики Ultralytics и данные `results.csv`.
 
-Образ собирался и проверялся запуском на CPU (1 эпоха), а полное обучение выполнялось в Colab и на локальной GTX 1650 (см. ноутбук).
+Образ собирался и проверялся запуском на CPU (1 эпоха), а полное обучение выполнялось в Colab.
 
-### Colab / локально
+### Colab 
 
 Подробно (обучение, сравнение моделей, экспорт) — в ноутбуке `notebooks/Lab2_YOLO26_variant1.ipynb`.
 
@@ -122,8 +122,6 @@ Precision / Recall (все классы): v1_3cls — 0.820 / 0.815; v2_4cls —
 
 Выбранная для приложения модель: **v2_4cls**. Общий mAP@0.5 выше (0.876 против 0.846), у `toothpaste` и `soap` метрики лучше, а `liquid_soap` добавляет четвёртый класс. Недостаток: у `toothbrush` mAP@0.5 ниже (0.793 против 0.847), возможно, из-за сходства флакона с носиком и щётки (это предположение, оно не проверялось).
 
-**Ограничения.** Обучающие кадры в основном взяты из открытых наборов (каталожные и студийные фото), поэтому метрика на val может завышать качество на реальных снимках в ванной. Для оценки на реальных условиях: **TODO — результат на собственных фото (N штук) или убрать абзац**.
-
 ## Экспорт в LiteRT
 
 ```python
@@ -137,7 +135,7 @@ YOLO("results/v2_4cls/weights/best.pt").export(format="litert", imgsz=640)
 
 ## Android-приложение
 
-Основа — приложение [surendramaran/YOLO](https://github.com/surendramaran/YOLO) (`YOLOv8-Object-Detector-Android-Tflite`, CC BY 4.0), которое разбиралось на лекции 3.
+Основа — приложение [surendramaran/YOLO](https://github.com/surendramaran/YOLO) (`YOLOv8-Object-Detector-Android-Tflite`, CC BY 4.0)
 
 Изменения относительно оригинала:
 - заменены модель (`app/src/main/assets/best.tflite`) и `labels.txt`;
@@ -154,11 +152,11 @@ YOLO("results/v2_4cls/weights/best.pt").export(format="litert", imgsz=640)
 
 | Параметр | Значение |
 |---|---|
-| Устройство | **TODO** |
-| Режим | CPU (4 потока / по умолчанию — TODO) |
+| Устройство | HUAWEI Pura 90s Pro (MLN-LX9), EMUI 16.0.0 |
+| Режим | CPU, 4 потока |
 | Размер входа | 640×640 |
-| Среднее время `interpreter.run`, мс | **TODO** (среднее по 20–30 кадрам) |
-| Минимум / максимум, мс | **TODO** |
+| Среднее время `interpreter.run`, мс | 153.6 (медиана 149) |
+| Минимум / максимум, мс | 145 / 202 |
 
 Скриншоты: `docs/profiling/`.
 
