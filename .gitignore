@@ -7,3 +7,4 @@ local.properties
 dataset/
 .venv/
 runs/
+docker_test/
